@@ -1,6 +1,8 @@
 package iris
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"golang.org/x/exp/slices"
@@ -19,16 +21,21 @@ type Peer struct {
 	disconnectMsg error
 }
 
-func (p *Peer) Fan() {
+func (p *Peer) Fan(ctx context.Context) {
 	for {
-		m := Cmd{}
-		err := p.conn.ReadJSON(&m)
-		if err != nil {
-			p.disconnectMsg = ErrConnectionClose
-			p.data <- NewCmd(nil, Disconnect, nil)
+		select {
+		case <-ctx.Done():
 			return
+		default:
+			m := Cmd{}
+			err := p.conn.ReadJSON(&m)
+			if err != nil {
+				p.disconnectMsg = ErrConnectionClose
+				p.data <- NewCmd(nil, Disconnect, nil)
+				return
+			}
+			p.data <- m
 		}
-		p.data <- m
 	}
 }
 

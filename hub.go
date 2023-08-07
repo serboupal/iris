@@ -87,7 +87,7 @@ func (h *Hub) ConnectPeer(w http.ResponseWriter, r *http.Request) (*Peer, error)
 	h.clients[c.Id] = &c
 	h.clientsMu.Unlock()
 
-	go c.Fan()
+	go c.Fan(context.Background())
 	return &c, nil
 }
 

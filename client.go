@@ -25,7 +25,7 @@ func (c *Client) Listen(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	go c.Fan()
+	go c.Fan(ctx)
 
 	for {
 		select {
