@@ -77,6 +77,7 @@ func (h *Hub) ConnectPeer(w http.ResponseWriter, r *http.Request) (*Peer, error)
 		return nil, err
 	}
 
+	//websocket don't support this header but it can be added in proxy
 	if r.Header.Get("X-Real-IP") != "" {
 		c.Addr = r.Header.Get("X-Real-IP")
 	} else {

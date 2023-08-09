@@ -2,7 +2,6 @@ package iris
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gorilla/websocket"
 )
@@ -30,9 +29,7 @@ func (c *Client) Listen(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			// Perform cleanup and graceful shutdown
-			fmt.Println("ctx done")
-			return nil
+			return ErrContextDone
 		case m := <-c.data:
 			switch m.Command {
 			case Disconnect:
