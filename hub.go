@@ -132,6 +132,7 @@ func (h *Hub) watchPeers() {
 					}
 				}
 				peer.disconnectMsg = ErrMalformedMsg
+
 			case Subscribe:
 				h.channelsMu.Lock()
 				for _, s := range m.Data {
@@ -163,6 +164,7 @@ func (h *Hub) watchPeers() {
 				h.servicesMu.Unlock()
 
 			case Consume:
+				m.ReplyTo = &uid
 				if len(m.Data) == 0 {
 					break
 				}
@@ -174,7 +176,7 @@ func (h *Hub) watchPeers() {
 					h.servicesMu.RUnlock()
 					break
 				}
-				peer.SendError(ErrServiceNotAvailable)
+				peer.SendError(m.Id, ErrServiceNotAvailable)
 
 			default:
 				peer.disconnectMsg = ErrInvalidCode
@@ -183,7 +185,7 @@ func (h *Hub) watchPeers() {
 		}
 		if peer.disconnectMsg != nil {
 			delete(h.clients, peer.Id)
-			peer.SendError(peer.disconnectMsg)
+			peer.SendError(nil, peer.disconnectMsg)
 			peer.Disconnect()
 		}
 	}

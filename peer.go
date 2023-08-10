@@ -48,8 +48,8 @@ func (p *Peer) Send(m Cmd) error {
 	return nil
 }
 
-func (p *Peer) SendError(err error) error {
-	m := NewCmd(nil, Error, []string{err.Error()})
+func (p *Peer) SendError(id *uuid.UUID, err error) error {
+	m := NewCmd(id, Error, []string{err.Error()})
 	return p.Send(m)
 
 }
