@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -27,7 +28,7 @@ func main() {
 		Handler:           http.DefaultServeMux,
 	}
 
-	hub = iris.NewHub(defHost)
+	hub = iris.NewHub(defHost, 5*time.Second, 5*time.Second)
 	hub.OringinFunc = func(r *http.Request) bool {
 		return true
 	}
@@ -35,9 +36,20 @@ func main() {
 	go func() {
 		err := srv.ListenAndServe()
 		if err != nil {
-			hub.Exit <- err
+			panic(err)
 		}
 	}()
+
+	hub.DoFunc = func(p *iris.Peer, c iris.Msg) {
+		fmt.Println("rcv ", c, "from peer", p.Id)
+		switch c.Data[0] {
+		case "hello":
+			fmt.Println("sending goodbye")
+			p.Send(iris.Msg{
+				Data: []string{"goodbye"},
+			})
+		}
+	}
 
 	err := hub.Listen(context.Background())
 	if err != nil {
@@ -46,17 +58,15 @@ func main() {
 }
 
 func helo(w http.ResponseWriter, r *http.Request) {
-	c, err := hub.ConnectPeer(w, r)
+	_, err := hub.ConnectPeer(w, r)
 	if err != nil {
 		return
 	}
-	m := iris.NewCmd(nil, iris.Hello, []string{c.Id.String()})
-	c.Send(m)
 }
 
 func stats(w http.ResponseWriter, r *http.Request) {
-	s := hub.Statics()
-
+	s := hub.Statics("iris")
+	w.Header().Add("Content-Type", "application/json")
 	data, err := json.Marshal(s)
 	if err != nil {
 		panic(err)

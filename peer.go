@@ -2,86 +2,86 @@ package iris
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"golang.org/x/exp/slices"
 )
 
 type Peer struct {
-	Addr     string   `json:"addr"`
-	Count    int      `json:"msg_count"`
-	Services []string `json:"services,omitempty"`
-	Channels []string `json:"channels,omitempty"`
+	Addr   string   `json:"addr"`
+	Count  int      `json:"msg_count"`
+	Groups []string `json:"groups,omitempty"`
 
-	Id            uuid.UUID `json:"-"`
-	hub           *Hub
-	conn          *websocket.Conn
-	data          chan Cmd
-	disconnectMsg error
+	Id     uuid.UUID `json:"-"`
+	hub    *Hub
+	conn   *websocket.Conn
+	cancel context.CancelFunc
+	data   chan Msg
 }
 
-func (p *Peer) Fan(ctx context.Context) {
+func (p *Peer) fan(ctx context.Context) {
+	ticker := time.NewTicker(p.hub.pingPeriod)
+	defer ticker.Stop()
+	ctx, p.cancel = context.WithCancel(ctx)
+	go p.read(p.cancel)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
-			m := Cmd{}
-			err := p.conn.ReadJSON(&m)
-			if err != nil {
-				p.disconnectMsg = ErrConnectionClose
-				p.data <- NewCmd(nil, Disconnect, nil)
-				return
-			}
-			p.data <- m
+		case <-ticker.C:
+			p.hub.ping <- p
 		}
 	}
 }
 
-func (p *Peer) Send(m Cmd) error {
-	p.Count++
-	err := p.conn.WriteJSON(m)
+func (p *Peer) read(cancel context.CancelFunc) {
+	err := p.conn.SetReadDeadline(time.Now().Add(p.hub.pingWait))
+	if err != nil {
+		p.hub.disconnect <- p
+		cancel()
+		return
+	}
+
+	p.conn.SetPongHandler(func(string) error {
+		p.conn.SetReadDeadline(time.Now().Add(p.hub.pingWait))
+		return nil
+	})
+
+	for {
+		v := Msg{}
+		err := p.conn.ReadJSON(&v)
+		if err != nil {
+			p.hub.disconnect <- p
+			cancel()
+			return
+		}
+		e := dataReq{
+			peer: p,
+			msg:  v,
+		}
+		p.hub.data <- &e
+	}
+}
+
+func (p *Peer) sendConn(v Msg, writeWait time.Duration) error {
+	err := p.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	if err != nil {
+		return err
+	}
+	err = p.conn.WriteJSON(v)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *Peer) SendError(id *uuid.UUID, err error) error {
-	m := NewCmd(id, Error, []string{err.Error()})
-	return p.Send(m)
-
-}
-
-func (p *Peer) Disconnect() error {
-	if len(p.Services) > 0 {
-		p.hub.servicesMu.Lock()
-		for _, v := range p.Services {
-			p.hub.services[v] = slices.DeleteFunc(p.hub.services[v], func(e *Peer) bool {
-				return e == p
-			})
-			if len(p.hub.services[v]) == 0 {
-				delete(p.hub.services, v)
-			}
-		}
-
-		p.hub.servicesMu.Unlock()
+func (p *Peer) Send(v Msg) {
+	r := dataReq{
+		peer: p,
+		msg:  v,
 	}
-
-	if len(p.Channels) > 0 {
-		p.hub.channelsMu.Lock()
-		for _, v := range p.Channels {
-			p.hub.channels[v] = slices.DeleteFunc(p.hub.channels[v], func(e *Peer) bool {
-				return e == p
-			})
-			if len(p.hub.channels[v]) == 0 {
-				delete(p.hub.channels, v)
-			}
-		}
-
-		p.hub.channelsMu.Unlock()
-	}
-
-	return p.conn.Close()
+	p.Count++
+	p.hub.send <- &r
 }

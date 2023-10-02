@@ -1,33 +1,23 @@
 package iris
 
-import (
-	"github.com/google/uuid"
-)
+import "github.com/google/uuid"
 
-type Command int
+type Command uint8
 
 const (
-	Disconnect Command = iota
-	Hello
-	Error
+	Data Command = iota
 	Subscribe
 	Publish
-	Provide
+	Unsubscribe
+	Produce
 	Consume
-	Response
+	Leave
 )
 
-type Cmd struct {
-	Id      *uuid.UUID `json:"id"`
-	ReplyTo *uuid.UUID `json:"reply,omitempty"`
-	Command Command    `json:"cmd"`
-	Data    []string   `json:"data,omitempty"`
-}
-
-func NewCmd(id *uuid.UUID, c Command, data []string) Cmd {
-	if id == nil {
-		e := uuid.New()
-		id = &e
-	}
-	return Cmd{Id: id, Command: c, Data: data}
+type Msg struct {
+	Id     *uuid.UUID `json:"id,omitempty"`
+	Dest   *uuid.UUID `json:"dest,omitempty"`
+	Source *uuid.UUID `json:"source,omitempty"`
+	Cmd    Command    `json:"cmd,omitempty"`
+	Data   []string   `json:"data,omitempty"`
 }

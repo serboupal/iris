@@ -5,9 +5,8 @@ function init() {
     // Connection opened
     socket.onopen = () => {
         var c = {
-            id: crypto.randomUUID(),
-            cmd: 6,
-            data: ["test"]
+            cmd: 1,
+            data: ["test-chan"]
         }
         const msg = JSON.stringify(c)
         socket.send(msg)
