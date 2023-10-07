@@ -212,6 +212,7 @@ func (h *Hub) processData(d *dataReq) {
 
 	case Produce:
 		if _, ok := h.groups[d.msg.Data[0]]; !ok || !h.groups[d.msg.Data[0]].Queue {
+			d.peer.Send(Msg{Cmd: Error, Data: []string{"not available"}})
 			break
 		}
 		r := rand.Int() % len(h.groups[d.msg.Data[0]].Peers)

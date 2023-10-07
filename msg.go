@@ -6,6 +6,7 @@ type Command uint8
 
 const (
 	Data Command = iota
+	Error
 	Subscribe
 	Publish
 	Unsubscribe
